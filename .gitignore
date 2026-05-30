@@ -1,0 +1,17 @@
+# Entornos virtuales
+venv/
+env/
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+
+# Variables de entorno y credenciales (Seguridad)
+.env
+
+# Base de datos local
+*.db
+*.sqlite3
+
+# Modelos generados
+*.pkl

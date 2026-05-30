@@ -23,5 +23,12 @@ class Tramite(Base):
     estado = Column(String, default="En Evaluación")
     fecha_creacion = Column(DateTime, default=datetime.datetime.utcnow)
 
+class Funcionario(Base):
+    __tablename__ = "funcionarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+
 # Crear las tablas
 Base.metadata.create_all(bind=engine)

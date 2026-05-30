@@ -7,3 +7,7 @@ Faker
 SQLAlchemy
 joblib
 python-dotenv
+slowapi
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart

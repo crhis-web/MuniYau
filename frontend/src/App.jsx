@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react'
 
 function App() {
   const [view, setView] = useState('ciudadano');
+  const [token, setToken] = useState(localStorage.getItem('token'));
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setView('ciudadano');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
@@ -27,10 +34,75 @@ function App() {
       </header>
 
       <main className="max-w-6xl mx-auto p-4 mt-6">
-        {view === 'ciudadano' ? <VistaCiudadano /> : <VistaFuncionario />}
+        {view === 'ciudadano' ? (
+          <VistaCiudadano />
+        ) : token ? (
+          <VistaFuncionario token={token} onLogout={handleLogout} />
+        ) : (
+          <VistaLogin setToken={setToken} />
+        )}
       </main>
     </div>
   )
+}
+
+function VistaLogin({ setToken }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    
+    const params = new URLSearchParams();
+    params.append('username', username);
+    params.append('password', password);
+
+    try {
+      const response = await fetch('http://localhost:8000/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params
+      });
+      const data = await response.json();
+      
+      if (response.ok) {
+        localStorage.setItem('token', data.access_token);
+        setToken(data.access_token);
+      } else {
+        setError(data.detail || 'Credenciales incorrectas');
+      }
+    } catch (err) {
+      setError('Error de conexión con el servidor');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="max-w-sm mx-auto bg-white p-8 rounded-lg shadow-md border border-gray-200 mt-10">
+      <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">Acceso Oficial</h2>
+      {error && <div className="bg-red-100 text-red-800 p-3 rounded text-sm mb-4 border border-red-200">{error}</div>}
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+          <input type="text" required value={username} onChange={e => setUsername(e.target.value)}
+            className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+          <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
+            className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+        </div>
+        <button type="submit" disabled={loading}
+          className="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded mt-4 transition-colors">
+          {loading ? 'Ingresando...' : 'Iniciar Sesión'}
+        </button>
+      </form>
+    </div>
+  );
 }
 
 function VistaCiudadano() {
@@ -119,14 +191,25 @@ function VistaCiudadano() {
   )
 }
 
-function VistaFuncionario() {
+function VistaFuncionario({ token, onLogout }) {
   const [tramites, setTramites] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tramiteSeleccionado, setTramiteSeleccionado] = useState(null);
 
   const fetchTramites = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/tramites');
+      const response = await fetch('http://localhost:8000/tramites', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.status === 401) {
+        onLogout(); // Token expirado o inválido
+        return;
+      }
+      
       if (response.ok) {
         const data = await response.json();
         const orden = { "Alta": 1, "Media": 2, "Baja": 3 };
@@ -158,9 +241,14 @@ function VistaFuncionario() {
     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-semibold text-gray-800">Panel de Control: Bandeja de Entrada</h2>
-        <button onClick={fetchTramites} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium border border-gray-300">
-          Actualizar Lista
-        </button>
+        <div className="space-x-3">
+          <button onClick={fetchTramites} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded text-sm font-medium border border-gray-300">
+            Actualizar Lista
+          </button>
+          <button onClick={onLogout} className="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1 rounded text-sm font-medium border border-red-200">
+            Cerrar Sesión
+          </button>
+        </div>
       </div>
       
       {loading ? (
@@ -174,7 +262,7 @@ function VistaFuncionario() {
                 <th className="p-3 font-medium">Ciudadano</th>
                 <th className="p-3 font-medium">Descripción (Analizada por IA)</th>
                 <th className="p-3 font-medium text-center">Prioridad</th>
-                <th className="p-3 font-medium">Estado</th>
+                <th className="p-3 font-medium">Acción</th>
               </tr>
             </thead>
             <tbody className="text-sm">
@@ -185,18 +273,72 @@ function VistaFuncionario() {
                   <tr key={t.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="p-3">#{t.id}</td>
                     <td className="p-3 font-medium text-gray-900">{t.nombres}<br/><span className="text-xs text-gray-500">{t.dni}</span></td>
-                    <td className="p-3 max-w-md truncate" title={t.descripcion}>{t.descripcion}</td>
+                    <td className="p-3 max-w-md truncate" title="Clic en Ver Detalles">{t.descripcion}</td>
                     <td className="p-3 text-center">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${getBadgeColor(t.prioridad)}`}>
                         {t.prioridad}
                       </span>
                     </td>
-                    <td className="p-3 text-gray-600">{t.estado}</td>
+                    <td className="p-3">
+                      <button 
+                        onClick={() => setTramiteSeleccionado(t)}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium underline"
+                      >
+                        Ver Detalles
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Modal de Detalles */}
+      {tramiteSeleccionado && (
+        <div className="fixed inset-0 backdrop-blur-sm bg-white/30 flex items-center justify-center p-4 z-50 transition-all">
+          <div className="bg-white rounded-lg shadow-2xl border border-gray-200 max-w-lg w-full p-6 animate-pop-in">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Detalle del Trámite #{tramiteSeleccionado.id}</h3>
+              <button 
+                onClick={() => setTramiteSeleccionado(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none"
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-500">Ciudadano</p>
+                <p className="text-gray-900">{tramiteSeleccionado.nombres} (DNI: {tramiteSeleccionado.dni})</p>
+              </div>
+              
+              <div>
+                <p className="text-sm font-semibold text-gray-500">Prioridad Asignada (IA)</p>
+                <span className={`px-2 py-1 rounded-full text-xs font-semibold border mt-1 inline-block ${getBadgeColor(tramiteSeleccionado.prioridad)}`}>
+                  {tramiteSeleccionado.prioridad}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-gray-500">Descripción Completa</p>
+                <div className="bg-gray-50 p-3 rounded border border-gray-200 text-gray-800 mt-1 whitespace-pre-wrap max-h-60 overflow-y-auto">
+                  {tramiteSeleccionado.descripcion}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button 
+                onClick={() => setTramiteSeleccionado(null)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

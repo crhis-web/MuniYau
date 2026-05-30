@@ -88,11 +88,38 @@ npm run dev
 
 El frontend estará disponible en `http://localhost:5173` y la API en `http://localhost:8000`.
 
+### 🔑 Credenciales de Prueba (Modo Evaluador/Profesor)
+Dado que el panel de funcionarios está altamente protegido por un sistema de **Autenticación con JWT (JSON Web Tokens)**, la API creará automáticamente un usuario administrador por defecto en la base de datos al encenderse por primera vez. Esto facilitará las pruebas en el entorno académico.
+
+Utilice las siguientes credenciales para acceder al **Panel Funcionario** en el frontend:
+* **Usuario:** `admin`
+* **Contraseña:** `admin123`
+
 ## 🌐 Pase a Producción (Siguientes Pasos)
 Para un despliegue real en oficinas gubernamentales (fuera de localhost):
 *   Empaquetar el backend en contenedores **Docker** usando `Gunicorn` como servidor de producción.
 *   Compilar el frontend (`npm run build`) y servir mediante **Nginx** o un CDN.
 *   Migrar de la base de datos local SQLite a **PostgreSQL**.
+
+## Mejora de Seguridad (Fase 6): Protección Anti-Trolls y Spam
+
+A solicitud del usuario, implementaremos medidas de grado de producción en el MVP para evitar ataques y basura de "chistosos".
+
+> [!IMPORTANT]
+> **Revisión del Usuario Requerida**
+> Por favor revisa las tácticas de protección descritas abajo. Si apruebas, modificaré los códigos del modelo y de la API.
+
+### 1. El Filtro Heurístico (Pre-Machine Learning)
+*   **El Punto Ciego de la IA:** El TF-IDF vectoriza palabras conocidas. Si un troll escribe `"asdfghj"`, la IA recibe un vector vacío y fallaría silenciosamente.
+*   **La Solución:** Antes de invocar al modelo `.pkl`, la API ejecuta una función Regex (expresiones regulares) que detecta patrones anómalos (ej. 6 consonantes seguidas, risas repetitivas). Si el texto es basura, se descarta sin gastar ciclos de CPU de inferencia.
+
+### 2. "Shadow Banning" Perfecto en la Base de Datos
+*   Cuando el filtro Heurístico detecta "Spam", el backend **NO** guarda el registro en SQLite y **NO** activa la notificación SMTP.
+*   Para que la mentira sea creíble y el frontend de React no crashee, la API devuelve un **ID de ticket falso (ej. 98321)**. Al troll se le muestra el mensaje de éxito, creyendo que su broma funcionó, evitando que busque vulnerabilidades más complejas.
+
+### 3. Límite de Peticiones (Rate Limiting) y el Problema del CGNAT
+*   Hemos instalado la librería `slowapi` limitando a **3 peticiones por minuto por IP** para evitar ataques automatizados (DoS).
+*   **Consideración Arquitectónica para Producción:** En provincias del Perú, los proveedores de telecomunicaciones usan agresivamente **CGNAT**, donde cientos de vecinos comparten una misma IP pública. Bloquear por IP en producción aislaría a ciudadanos legítimos. En una fase posterior de escalamiento, este bloqueo debe reemplazarse por **Browser Fingerprinting** o **Tokens de Sesión (JWT)** vinculados a la RENIEC.
 
 ## 📸 Documentación de API Autogenerada
 FastAPI provee documentación interactiva automática bajo el estándar OpenAPI.
